@@ -47,6 +47,10 @@ Yes. I asked my AI assistant to review the skeleton for missing relationships an
 - Describe one tradeoff your scheduler makes.
 - Why is that tradeoff reasonable for this scenario?
 
+My scheduler warns about conflicts instead of resolving them. If two tasks have overlapping preferred times, both stay in the plan and `detect_conflicts()` returns a message describing the clash, so the plan can still contain two things at once. It also counts tasks for different pets as conflicts and doesn't try to tell which ones could be done together, such as feeding two pets at the same time.
+
+This is reasonable because a preferred time is a choice the owner made, and the owner knows things the scheduler doesn't, like whether a vet appointment can move or whether two tasks can be combined. Moving a task automatically could quietly put medication at the wrong time, which is worse for a busy owner than seeing a warning and deciding for themselves. It also keeps the logic simple, and the check never crashes the app.
+
 ---
 
 ## 3. AI Collaboration

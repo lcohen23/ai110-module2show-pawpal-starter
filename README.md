@@ -82,14 +82,12 @@ Sample test output:
 
 ## 📐 Smarter Scheduling
 
-> Fill in once you've implemented scheduling logic.
-
 | Feature | Method(s) | Notes |
 |---------|-----------|-------|
-| Task sorting | | e.g., by priority, duration |
-| Filtering | | e.g., skip tasks if time runs out |
-| Conflict handling | | e.g., overlapping time slots |
-| Recurring tasks | | e.g., daily vs. weekly |
+| Task sorting | `Scheduler.sort_by_time()`, `Scheduler.sort_tasks()` | `sort_by_time()` orders tasks by preferred time, with untimed tasks last. `sort_tasks()` orders by highest priority, then shortest duration, which decides who gets the available minutes first. |
+| Filtering | `Owner.filter_tasks()`, `Scheduler.collect_tasks()`, `Scheduler.generate_plan()` | `filter_tasks()` filters by pet name, completion status, or both. `collect_tasks()` keeps incomplete tasks due on or before the plan date. `generate_plan()` skips tasks that don't fit in the available time. |
+| Conflict handling | `Scheduler.detect_conflicts()` | Compares start and end times of planned tasks, for the same pet or different pets, and returns a warning message for each overlapping pair. It never moves a task or raises an error. Tasks without a preferred time fill open gaps, so only tasks with fixed preferred times can conflict. |
+| Recurring tasks | `Pet.complete_task()`, `Task.next_occurrence()` | Completing a daily or weekly task adds a new copy due 1 or 7 days later, using `timedelta`. The date counts from today or the task's due date, whichever is later. Other frequencies don't repeat. |
 
 ## 📸 Demo Walkthrough
 

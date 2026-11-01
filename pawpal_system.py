@@ -1,8 +1,10 @@
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
+from datetime import date, timedelta
 
 PRIORITY_RANK = {"low": 1, "medium": 2, "high": 3}
+RECURRENCE_DAYS = {"daily": 1, "weekly": 7}
 
 
 def to_minutes(clock_time: str) -> int:
@@ -27,14 +29,20 @@ class Task:
     preferred_time: str = ""
     completed: bool = False
     pet_name: str = ""
+    due_date: date = field(default_factory=date.today)
 
     def mark_complete(self) -> None:
         """Mark this task as done."""
         self.completed = True
 
-    def reset_for_next_occurrence(self) -> None:
-        """Mark this task as not done so it can be scheduled again."""
-        self.completed = False
+    def next_occurrence(self, today: date) -> Task | None:
+        """Return a copy of this task for its next due date, or None if it doesn't recur."""
+        days = RECURRENCE_DAYS.get(self.frequency)
+        if days is None:
+            return None
+        # Counting from the later date keeps late and early completions on schedule.
+        next_due = max(self.due_date, today) + timedelta(days=days)
+        return replace(self, completed=False, due_date=next_due)
 
 
 @dataclass
@@ -76,6 +84,16 @@ class Pet:
         """Remove a task from this pet."""
         self.tasks.remove(task)
 
+    def complete_task(self, task: Task, today: date | None = None) -> Task | None:
+        """Complete a task and add its next occurrence, returning the new task if any."""
+        if task.completed:
+            return None
+        task.mark_complete()
+        next_task = task.next_occurrence(today or date.today())
+        if next_task:
+            self.tasks.append(next_task)
+        return next_task
+
     def get_pending_tasks(self) -> list[Task]:
         """Return this pet's tasks that are not yet completed."""
         return [task for task in self.tasks if not task.completed]
@@ -100,24 +118,51 @@ class Owner:
         """Return every task across all of this owner's pets."""
         return [task for pet in self.pets for task in pet.tasks]
 
+    def filter_tasks(
+        self, pet_name: str | None = None, completed: bool | None = None
+    ) -> list[Task]:
+        """Return tasks matching the given pet name and completion status, if provided."""
+        return [
+            task
+            for task in self.get_all_tasks()
+            if (pet_name is None or task.pet_name == pet_name)
+            and (completed is None or task.completed == completed)
+        ]
+
 
 class Scheduler:
-    def __init__(self, owner: Owner, day_start: str = "08:00") -> None:
+    def __init__(
+        self, owner: Owner, day_start: str = "08:00", plan_date: date | None = None
+    ) -> None:
         """Create a scheduler for an owner with an empty plan."""
         self.owner = owner
         self.day_start = day_start
+        self.plan_date = plan_date or date.today()
         self.plan: list[ScheduledTask] = []
         self.skipped_tasks: list[Task] = []
 
     def collect_tasks(self) -> list[Task]:
-        """Return all incomplete tasks across the owner's pets."""
-        return [task for task in self.owner.get_all_tasks() if not task.completed]
+        """Return incomplete tasks due on or before the plan date."""
+        return [
+            task
+            for task in self.owner.get_all_tasks()
+            if not task.completed and task.due_date <= self.plan_date
+        ]
 
     def sort_tasks(self, tasks: list[Task]) -> list[Task]:
         """Return tasks sorted by highest priority, then shortest duration."""
         return sorted(
             tasks,
             key=lambda task: (-PRIORITY_RANK[task.priority], task.duration_minutes),
+        )
+
+    def sort_by_time(self, tasks: list[Task]) -> list[Task]:
+        """Return tasks sorted by preferred time, with untimed tasks last."""
+        return sorted(
+            tasks,
+            key=lambda task: (
+                to_minutes(task.preferred_time) if task.preferred_time else float("inf")
+            ),
         )
 
     def generate_plan(self) -> list[ScheduledTask]:
