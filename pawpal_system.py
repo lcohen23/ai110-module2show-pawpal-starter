@@ -4,13 +4,19 @@ from dataclasses import dataclass, field, replace
 from datetime import date, timedelta
 
 PRIORITY_RANK = {"low": 1, "medium": 2, "high": 3}
-RECURRENCE_DAYS = {"daily": 1, "weekly": 7}
+RECURRENCE_DAYS = {"once": None, "daily": 1, "weekly": 7}
+MINUTES_PER_DAY = 24 * 60
 
 
 def to_minutes(clock_time: str) -> int:
     """Convert an "HH:MM" string to minutes after midnight."""
-    hours, minutes = clock_time.split(":")
-    return int(hours) * 60 + int(minutes)
+    try:
+        hours, minutes = (int(part) for part in clock_time.split(":"))
+    except ValueError:
+        raise ValueError(f"Invalid time {clock_time!r}, expected HH:MM") from None
+    if not (0 <= hours <= 23 and 0 <= minutes <= 59):
+        raise ValueError(f"Invalid time {clock_time!r}, expected HH:MM")
+    return hours * 60 + minutes
 
 
 def to_clock_time(minutes: int) -> str:
@@ -31,13 +37,23 @@ class Task:
     pet_name: str = ""
     due_date: date = field(default_factory=date.today)
 
+    def __post_init__(self) -> None:
+        """Normalize the frequency and reject invalid field values."""
+        self.frequency = self.frequency.lower()
+        if self.frequency not in RECURRENCE_DAYS:
+            raise ValueError(f"Unknown frequency {self.frequency!r}")
+        if self.priority not in PRIORITY_RANK:
+            raise ValueError(f"Unknown priority {self.priority!r}")
+        if self.preferred_time:
+            to_minutes(self.preferred_time)
+
     def mark_complete(self) -> None:
         """Mark this task as done."""
         self.completed = True
 
     def next_occurrence(self, today: date) -> Task | None:
         """Return a copy of this task for its next due date, or None if it doesn't recur."""
-        days = RECURRENCE_DAYS.get(self.frequency)
+        days = RECURRENCE_DAYS[self.frequency]
         if days is None:
             return None
         # Counting from the later date keeps late and early completions on schedule.
@@ -78,7 +94,10 @@ class Pet:
         for name, value in changes.items():
             if not hasattr(task, name):
                 raise ValueError(f"Task has no field named {name!r}")
-            setattr(task, name, value)
+        # Building a copy runs validation before the real task changes.
+        updated = replace(task, **changes)
+        for name in changes:
+            setattr(task, name, getattr(updated, name))
 
     def remove_task(self, task: Task) -> None:
         """Remove a task from this pet."""
@@ -86,6 +105,8 @@ class Pet:
 
     def complete_task(self, task: Task, today: date | None = None) -> Task | None:
         """Complete a task and add its next occurrence, returning the new task if any."""
+        if task not in self.tasks:
+            raise ValueError(f"{task.title!r} does not belong to {self.name}")
         if task.completed:
             return None
         task.mark_complete()
@@ -140,6 +161,7 @@ class Scheduler:
         self.plan_date = plan_date or date.today()
         self.plan: list[ScheduledTask] = []
         self.skipped_tasks: list[Task] = []
+        self.skip_reasons: dict[Task, str] = {}
 
     def collect_tasks(self) -> list[Task]:
         """Return incomplete tasks due on or before the plan date."""
@@ -169,6 +191,7 @@ class Scheduler:
         """Build today's plan from the available time and return it in time order."""
         self.plan = []
         self.skipped_tasks = []
+        self.skip_reasons = {}
 
         # Highest priority tasks claim the available minutes first.
         selected = []
@@ -178,7 +201,7 @@ class Scheduler:
                 selected.append(task)
                 remaining -= task.duration_minutes
             else:
-                self.skipped_tasks.append(task)
+                self._skip(task, f"only {remaining} min left")
 
         # Tasks with a preferred time are fixed, then the rest fill the gaps around them.
         for task in selected:
@@ -187,10 +210,18 @@ class Scheduler:
         for task in selected:
             if not task.preferred_time:
                 start = self._find_open_start(task.duration_minutes)
-                self.plan.append(ScheduledTask(task, to_clock_time(start)))
+                if start + task.duration_minutes <= MINUTES_PER_DAY:
+                    self.plan.append(ScheduledTask(task, to_clock_time(start)))
+                else:
+                    self._skip(task, "no open time left today")
 
         self.plan.sort(key=lambda entry: entry.start_minutes)
         return self.plan
+
+    def _skip(self, task: Task, reason: str) -> None:
+        """Record that a task was left out of the plan and why."""
+        self.skipped_tasks.append(task)
+        self.skip_reasons[task] = reason
 
     def _find_open_start(self, duration_minutes: int) -> int:
         """Return the earliest start in minutes where a task fits without overlap."""
@@ -230,12 +261,10 @@ class Scheduler:
                 f"({task.duration_minutes} min): {reason}"
             )
 
-        used = sum(entry.task.duration_minutes for entry in self.plan)
-        remaining = self.owner.available_minutes - used
         for task in self.skipped_tasks:
             lines.append(
                 f"Skipped {task.title} for {task.pet_name} "
-                f"({task.duration_minutes} min): only {remaining} min left"
+                f"({task.duration_minutes} min): {self.skip_reasons[task]}"
             )
 
         for conflict in self.detect_conflicts():

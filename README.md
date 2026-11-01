@@ -44,7 +44,7 @@ pip install -r requirements.txt
 
 ## 🖥️ Sample Output
 
-Terminal output from running `python main.py`:
+First section of the terminal output from running `python main.py`. The rest of the demo shows sorting, filtering, recurring tasks, and conflict warnings:
 
 ```
 Today's Schedule for Jordan
@@ -66,28 +66,55 @@ Why this plan:
 
 ## 🧪 Testing PawPal+
 
+Run the full test suite:
+
 ```bash
-# Run the full test suite:
-pytest
-
-# Run with coverage:
-pytest --cov
+python -m pytest
 ```
 
-Sample test output:
+### What the tests cover
+
+The 49 test cases in `tests/test_pawpal.py` cover each main behavior, including happy paths and edge cases:
+
+- **Sorting:** chronological order, untimed tasks last, and priority then duration
+- **Plan building:** filling gaps around fixed tasks, exact time fits, no tasks, no pets, and no available time
+- **Recurring tasks:** daily and weekly repeats, late and early completion, year rollover, and double completion
+- **Due dates:** overdue tasks, tasks not yet due, and plans that only change when regenerated
+- **Filtering:** by pet, by status, by both, and by an unknown pet
+- **Conflict detection:** duplicate times, partial overlaps, back-to-back tasks, and conflicts between pets
+- **Validation and day limits:** invalid frequencies, priorities, and times, rejected edits, and tasks that run past midnight
+
+### Test output
 
 ```
-# Paste your pytest output here
+============================= test session starts =============================
+platform win32 -- Python 3.14.7, pytest-9.1.1, pluggy-1.6.0
+rootdir: C:\Users\liamb\OneDrive\Documents\GitHub\ai110-module2show-pawpal-starter
+configfile: pytest.ini
+testpaths: tests
+plugins: anyio-4.15.1
+collected 49 items
+
+tests\test_pawpal.py .................................................   [100%]
+
+============================= 49 passed in 0.07s ==============================
 ```
+
+### Confidence Level
+
+⭐⭐⭐⭐⭐ (5/5)
+
+Based on test results, all 49 tests pass, covering the scheduling logic's main behaviors and edge cases.
 
 ## 📐 Smarter Scheduling
 
 | Feature | Method(s) | Notes |
 |---------|-----------|-------|
 | Task sorting | `Scheduler.sort_by_time()`, `Scheduler.sort_tasks()` | `sort_by_time()` orders tasks by preferred time, with untimed tasks last. `sort_tasks()` orders by highest priority, then shortest duration, which decides who gets the available minutes first. |
-| Filtering | `Owner.filter_tasks()`, `Scheduler.collect_tasks()`, `Scheduler.generate_plan()` | `filter_tasks()` filters by pet name, completion status, or both. `collect_tasks()` keeps incomplete tasks due on or before the plan date. `generate_plan()` skips tasks that don't fit in the available time. |
+| Filtering | `Owner.filter_tasks()`, `Scheduler.collect_tasks()`, `Scheduler.generate_plan()` | `filter_tasks()` filters by pet name, completion status, or both. `collect_tasks()` keeps incomplete tasks due on or before the plan date. `generate_plan()` skips tasks that don't fit in the available time, and flexible tasks that would run past midnight. |
 | Conflict handling | `Scheduler.detect_conflicts()` | Compares start and end times of planned tasks, for the same pet or different pets, and returns a warning message for each overlapping pair. It never moves a task or raises an error. Tasks without a preferred time fill open gaps, so only tasks with fixed preferred times can conflict. |
-| Recurring tasks | `Pet.complete_task()`, `Task.next_occurrence()` | Completing a daily or weekly task adds a new copy due 1 or 7 days later, using `timedelta`. The date counts from today or the task's due date, whichever is later. Other frequencies don't repeat. |
+| Recurring tasks | `Pet.complete_task()`, `Task.next_occurrence()` | Completing a daily or weekly task adds a new copy due 1 or 7 days later, using `timedelta`. The date counts from today or the task's due date, whichever is later. A `once` task doesn't repeat, and any other frequency raises a `ValueError`. |
+| Input validation | `Task.__post_init__()`, `to_minutes()`, `Pet.edit_task()`, `Pet.complete_task()` | Invalid frequencies, priorities, and times raise a `ValueError`. Edits are checked before they change a task, and a pet can't complete another pet's task. |
 
 ## 📸 Demo Walkthrough
 

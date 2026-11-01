@@ -79,6 +79,8 @@ This is reasonable because a preferred time is a choice the owner made, and the 
 - How confident are you that your scheduler works correctly?
 - What edge cases would you test next if you had more time?
 
+**Known limitations:** The scheduler only plans one day at a time. A task with a preferred time can run past midnight, such as a 90-minute task at 23:30, and an overlap across midnight isn't detected as a conflict. I left fixed-time tasks in the plan because the owner chose that time on purpose, and skipping something like meds would be worse than letting it run late.
+
 ---
 
 ## 5. Reflection
