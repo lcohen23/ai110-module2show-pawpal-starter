@@ -13,10 +13,25 @@
 - Briefly describe your initial UML design.
 - What classes did you include, and what responsibilities did you assign to each?
 
+My initial UML had four classes, split so that three hold data and one makes decisions. An owner has many pets, a pet has many tasks, and the scheduler works from the owner.
+
+- **Owner** holds the owner's name, available minutes, preferences, and pets. It adds and removes pets and gathers the tasks across all of them, so it is the scheduler's single entry point to the data.
+- **Pet** holds a pet's name, species, age, and tasks. It adds, edits, and removes tasks and returns the ones still pending.
+- **Task** represents one care activity, with its title, category, duration, priority, frequency, preferred time, and completion status. It can mark itself complete and reset for its next occurrence.
+- **Scheduler** holds the scheduling logic. It collects and sorts tasks, fits them into the available time to build a plan, tracks what was skipped, detects conflicts, and explains its choices.
+
+I used dataclasses for Owner, Pet, and Task because they mainly store data, and a regular class for Scheduler because it is mostly behavior. Keeping the logic in Scheduler means the scheduling rules can change without touching the data classes.
+
 **b. Design changes**
 
 - Did your design change during implementation?
 - If yes, describe at least one change and why you made it.
+
+Yes. I asked my AI assistant to review the skeleton for missing relationships and logic bottlenecks, and made three changes based on its feedback:
+
+- **Added a `ScheduledTask` class and `Scheduler.day_start`.** The plan was a plain list of tasks, which left nowhere to store when each task happens. `ScheduledTask` pairs a task with its start time, and `day_start` gives the scheduler a time to count from. Keeping start times out of `Task` means regenerating a plan doesn't change the tasks themselves.
+- **Added `Task.pet_name`.** `Owner.get_all_tasks()` returns one flat list, so a task lost its link to its pet. With more than one pet, the plan and its explanation couldn't say whose walk it was.
+- **Added a `PRIORITY_RANK` lookup.** Priorities are strings, so sorting them directly would be alphabetical and put "high" before "medium" but "low" before "medium". The lookup gives them a numeric order.
 
 ---
 
