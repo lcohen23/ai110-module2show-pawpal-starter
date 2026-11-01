@@ -1,26 +1,43 @@
 # PawPal+ (Module 2 Project)
 
-You are building **PawPal+**, a Streamlit app that helps a pet owner plan care tasks for their pet.
+**PawPal+** is a Streamlit app that helps a pet owner plan care tasks for their pets.
 
 ## Scenario
 
-A busy pet owner needs help staying consistent with pet care. They want an assistant that can:
+A busy pet owner needs help staying consistent with pet care. PawPal+ tracks care tasks across their pets, fits them into the time available, and produces a daily plan that explains its choices.
 
-- Track pet care tasks (walks, feeding, meds, enrichment, grooming, etc.)
-- Consider constraints (time available, priority, owner preferences)
-- Produce a daily plan and explain why it chose that plan
+## Features
 
-Your job is to design the system first (UML), then implement the logic in Python, then connect it to the Streamlit UI.
+- **Priority-based planning:** High-priority tasks claim the available minutes first, and skipped tasks come with a reason.
+- **Fixed and flexible times:** Tasks with a preferred time stay put, and flexible tasks fill the earliest gaps.
+- **Sorting by time:** Tasks run chronologically, with flexible tasks last.
+- **Filtering:** View tasks by pet, completion status, or both.
+- **Conflict warnings:** Overlapping tasks trigger a warning, for the same pet or across pets.
+- **Daily and weekly recurrence:** Completing a recurring task creates its next occurrence.
+- **Due dates:** Plans include tasks due today or overdue.
+- **Plan explanations:** Each planned task shows why it was chosen.
+- **Input validation:** Invalid priorities, frequencies, and times are rejected.
 
-## What you will build
+### Current limitations
 
-Your final app should:
+- Tasks can't be edited or removed in the app, only in the logic layer.
+- Refreshing the page clears all data.
+- Owner preferences are stored but don't affect the plan yet.
+- The app always plans from 08:00 today.
 
-- Let a user enter basic owner + pet info
-- Let a user add/edit tasks (duration + priority at minimum)
-- Generate a daily schedule/plan based on constraints and priorities
-- Display the plan clearly (and ideally explain the reasoning)
-- Include tests for the most important scheduling behaviors
+## System design
+
+The logic lives in `pawpal_system.py`, separate from the UI, so `app.py`, `main.py`, and the tests all use the same classes.
+
+| Class | Responsibility |
+|-------|----------------|
+| `Owner` | Holds the owner's details and pets, and gathers and filters tasks across them. |
+| `Pet` | Holds a pet's details and manages its tasks. |
+| `Task` | One care activity, with its duration, priority, frequency, due date, and status. |
+| `ScheduledTask` | Pairs a `Task` with its start time in a plan. |
+| `Scheduler` | Sorts tasks across all pets, builds the plan, detects conflicts, and explains its choices. |
+
+The full class diagram is in `diagrams/uml_final.mmd`.
 
 ## Getting started
 
@@ -32,36 +49,16 @@ source .venv/bin/activate  # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
 ```
 
-### Suggested workflow
+### Run the app
 
-1. Read the scenario carefully and identify requirements and edge cases.
-2. Draft a UML diagram (classes, attributes, methods, relationships).
-3. Convert UML into Python class stubs (no logic yet).
-4. Implement scheduling logic in small increments.
-5. Add tests to verify key behaviors.
-6. Connect your logic to the Streamlit UI in `app.py`.
-7. Refine UML so it matches what you actually built.
-
-## 🖥️ Sample Output
-
-First section of the terminal output from running `python main.py`. The rest of the demo shows sorting, filtering, recurring tasks, and conflict warnings:
-
+```bash
+streamlit run app.py
 ```
-Today's Schedule for Jordan
-========================================================
-Time   Task              Pet        Min  Priority
---------------------------------------------------------
-07:00  Breakfast         Biscuit     10  high
-07:30  Morning walk      Biscuit     30  high
-08:00  Thyroid meds      Mochi        5  high
-18:00  Puzzle feeder     Mochi       20  medium
 
-Why this plan:
-  07:00 - Breakfast for Biscuit (10 min): high priority
-  07:30 - Morning walk for Biscuit (30 min): high priority, at its preferred time
-  08:00 - Thyroid meds for Mochi (5 min): high priority, at its preferred time
-  18:00 - Puzzle feeder for Mochi (20 min): medium priority, at its preferred time
-  Skipped Brush coat for Biscuit (45 min): only 25 min left
+### Run the terminal demo
+
+```bash
+python main.py
 ```
 
 ## 🧪 Testing PawPal+
@@ -74,15 +71,15 @@ python -m pytest
 
 ### What the tests cover
 
-The 49 test cases in `tests/test_pawpal.py` cover each main behavior, including happy paths and edge cases:
+The 49 test cases in `tests/test_pawpal.py` cover:
 
-- **Sorting:** chronological order, untimed tasks last, and priority then duration
-- **Plan building:** filling gaps around fixed tasks, exact time fits, no tasks, no pets, and no available time
-- **Recurring tasks:** daily and weekly repeats, late and early completion, year rollover, and double completion
-- **Due dates:** overdue tasks, tasks not yet due, and plans that only change when regenerated
-- **Filtering:** by pet, by status, by both, and by an unknown pet
-- **Conflict detection:** duplicate times, partial overlaps, back-to-back tasks, and conflicts between pets
-- **Validation and day limits:** invalid frequencies, priorities, and times, rejected edits, and tasks that run past midnight
+- **Sorting:** time order, and priority then duration
+- **Plan building:** gaps around fixed tasks, exact fits, and empty cases
+- **Recurring tasks:** daily, weekly, late and early completion, and year rollover
+- **Due dates:** overdue tasks and tasks not yet due
+- **Filtering:** by pet, status, or both
+- **Conflict detection:** same times, partial overlaps, back-to-back tasks, and across pets
+- **Validation and day limits:** invalid input and tasks past midnight
 
 ### Test output
 
@@ -104,26 +101,129 @@ tests\test_pawpal.py .................................................   [100%]
 
 ⭐⭐⭐⭐⭐ (5/5)
 
-Based on test results, all 49 tests pass, covering the scheduling logic's main behaviors and edge cases.
+Based on test results: all 49 tests pass.
 
 ## 📐 Smarter Scheduling
 
 | Feature | Method(s) | Notes |
 |---------|-----------|-------|
-| Task sorting | `Scheduler.sort_by_time()`, `Scheduler.sort_tasks()` | `sort_by_time()` orders tasks by preferred time, with untimed tasks last. `sort_tasks()` orders by highest priority, then shortest duration, which decides who gets the available minutes first. |
-| Filtering | `Owner.filter_tasks()`, `Scheduler.collect_tasks()`, `Scheduler.generate_plan()` | `filter_tasks()` filters by pet name, completion status, or both. `collect_tasks()` keeps incomplete tasks due on or before the plan date. `generate_plan()` skips tasks that don't fit in the available time, and flexible tasks that would run past midnight. |
-| Conflict handling | `Scheduler.detect_conflicts()` | Compares start and end times of planned tasks, for the same pet or different pets, and returns a warning message for each overlapping pair. It never moves a task or raises an error. Tasks without a preferred time fill open gaps, so only tasks with fixed preferred times can conflict. |
-| Recurring tasks | `Pet.complete_task()`, `Task.next_occurrence()` | Completing a daily or weekly task adds a new copy due 1 or 7 days later, using `timedelta`. The date counts from today or the task's due date, whichever is later. A `once` task doesn't repeat, and any other frequency raises a `ValueError`. |
-| Input validation | `Task.__post_init__()`, `to_minutes()`, `Pet.edit_task()`, `Pet.complete_task()` | Invalid frequencies, priorities, and times raise a `ValueError`. Edits are checked before they change a task, and a pet can't complete another pet's task. |
+| Task sorting | `Scheduler.sort_by_time()`, `Scheduler.sort_tasks()` | By preferred time with untimed tasks last, or by priority then duration. |
+| Filtering | `Owner.filter_tasks()`, `Scheduler.collect_tasks()` | By pet and completion status, or by tasks due on the plan date. |
+| Conflict handling | `Scheduler.detect_conflicts()` | Returns a warning for each overlapping pair, across pets, without moving tasks. |
+| Recurring tasks | `Pet.complete_task()`, `Task.next_occurrence()` | Adds a new copy due 1 or 7 days later, using `timedelta`. |
+| Input validation | `Task.__post_init__()`, `to_minutes()` | Invalid frequencies, priorities, and times raise a `ValueError`. |
 
 ## 📸 Demo Walkthrough
 
-Describe your app in numbered steps so a reader can follow along without watching a video:
+### Main UI features
 
-1. <!-- Describe this step -->
-2. <!-- Describe this step -->
-3. <!-- Describe this step -->
-4. <!-- Describe this step -->
-5. <!-- Add more steps as needed -->
+- **Owner:** Enter your name and available minutes.
+- **Pets:** Add pets with a name, species, and age.
+- **Tasks:** Add tasks to a pet, including frequency and an optional preferred time.
+- **Task list:** Mark tasks complete, and filter a list sorted by time.
+- **Build Schedule:** See the plan, conflict warnings, skipped tasks, and the reasoning. It stays visible and updates as tasks change.
 
-**Screenshot or video** *(optional)*: <!-- Insert a screenshot or link to a demo video here -->
+### Example workflow
+
+1. Set the time available to 60 minutes, then add two pets: Mochi and Biscuit.
+2. Add these tasks:
+
+   | Pet | Task | Minutes | Priority | Frequency | Preferred time |
+   |-----|------|---------|----------|-----------|----------------|
+   | Mochi | Meds | 5 | high | once | 09:00 |
+   | Mochi | Dinner | 10 | high | daily | 18:00 |
+   | Biscuit | Walk | 20 | high | daily | 09:00 |
+   | Biscuit | Breakfast | 5 | medium | daily | |
+   | Biscuit | Bath | 40 | low | weekly | |
+
+3. Set "Show pet" to Mochi to filter the time-sorted task list.
+4. Click **Generate schedule**. The summary reads "Planned 4 task(s) using 40 of 60 available minutes."
+5. Read the warning that Meds and Walk overlap at 09:00.
+6. Check the schedule: Breakfast takes the 08:00 slot, and Bath is skipped with "only 20 min left".
+7. Mark Walk complete. The app shows its next due date, which is tomorrow, and the schedule updates so Bath now fits.
+
+### Key Scheduler behaviors shown
+
+- **Priority:** High-priority tasks claim time first, so Bath is skipped.
+- **Sorting:** The task list and plan run in time order.
+- **Filtering:** The dropdowns narrow tasks by pet and status.
+- **Conflict warnings:** Meds and Walk are flagged, and neither moves.
+- **Recurrence:** Completing Walk adds the next one, due tomorrow.
+
+### Sample CLI output
+
+Output from running `python main.py`, which uses its own example data:
+
+```
+Today's Schedule for Jordan
+========================================================
+Time   Task              Pet        Min  Priority
+--------------------------------------------------------
+07:00  Breakfast         Biscuit     10  high
+07:30  Morning walk      Biscuit     30  high
+08:00  Thyroid meds      Mochi        5  high
+18:00  Puzzle feeder     Mochi       20  medium
+
+Why this plan:
+  07:00 - Breakfast for Biscuit (10 min): high priority
+  07:30 - Morning walk for Biscuit (30 min): high priority, at its preferred time
+  08:00 - Thyroid meds for Mochi (5 min): high priority, at its preferred time
+  18:00 - Puzzle feeder for Mochi (20 min): medium priority, at its preferred time
+  Skipped Brush coat for Biscuit (45 min): only 25 min left
+
+All tasks, as added
+--------------------------------------------------------
+--:--  Brush coat        Biscuit   pending  2026-11-01
+--:--  Breakfast         Biscuit   pending  2026-11-01
+07:30  Morning walk      Biscuit   pending  2026-11-01
+18:00  Puzzle feeder     Mochi     pending  2026-11-01
+08:00  Thyroid meds      Mochi     pending  2026-11-01
+
+Sorted by time
+--------------------------------------------------------
+07:30  Morning walk      Biscuit   pending  2026-11-01
+08:00  Thyroid meds      Mochi     pending  2026-11-01
+18:00  Puzzle feeder     Mochi     pending  2026-11-01
+--:--  Brush coat        Biscuit   pending  2026-11-01
+--:--  Breakfast         Biscuit   pending  2026-11-01
+
+Mochi's tasks
+--------------------------------------------------------
+18:00  Puzzle feeder     Mochi     pending  2026-11-01
+08:00  Thyroid meds      Mochi     pending  2026-11-01
+
+Completed tasks
+--------------------------------------------------------
+--:--  Brush coat        Biscuit   done     2026-11-01
+07:30  Morning walk      Biscuit   done     2026-11-01
+
+Biscuit's pending tasks
+--------------------------------------------------------
+--:--  Breakfast         Biscuit   pending  2026-11-01
+07:30  Morning walk      Biscuit   pending  2026-11-02
+--:--  Brush coat        Biscuit   pending  2026-11-08
+
+Tomorrow's Schedule for Jordan
+========================================================
+Time   Task              Pet        Min  Priority
+--------------------------------------------------------
+07:00  Breakfast         Biscuit     10  high
+07:30  Morning walk      Biscuit     30  high
+08:00  Thyroid meds      Mochi        5  high
+18:00  Puzzle feeder     Mochi       20  medium
+
+Why this plan:
+  07:00 - Breakfast for Biscuit (10 min): high priority
+  07:30 - Morning walk for Biscuit (30 min): high priority, at its preferred time
+  08:00 - Thyroid meds for Mochi (5 min): high priority, at its preferred time
+  18:00 - Puzzle feeder for Mochi (20 min): medium priority, at its preferred time
+
+Conflict check
+--------------------------------------------------------
+No conflicts found.
+
+Conflict check
+--------------------------------------------------------
+WARNING: Joint meds (Biscuit) at 09:00 overlaps Morning walk (Biscuit) at 09:00
+WARNING: Lunch (Biscuit) at 12:00 overlaps Lunch (Mochi) at 12:00
+```

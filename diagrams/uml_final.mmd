@@ -1,0 +1,71 @@
+classDiagram
+    %% Final design, matching pawpal_system.py.
+
+    class Owner {
+        +str name
+        +int available_minutes
+        +dict preferences
+        +list~Pet~ pets
+        +add_pet(pet: Pet) None
+        +remove_pet(pet: Pet) None
+        +get_all_tasks() list~Task~
+        +filter_tasks(pet_name: str, completed: bool) list~Task~
+    }
+
+    class Pet {
+        +str name
+        +str species
+        +int age
+        +list~Task~ tasks
+        +add_task(task: Task) None
+        +edit_task(task: Task, changes: dict) None
+        +remove_task(task: Task) None
+        +complete_task(task: Task, today: date) Task?
+        +get_pending_tasks() list~Task~
+    }
+
+    class Task {
+        +str title
+        +str category
+        +int duration_minutes
+        +str priority
+        +str frequency
+        +str preferred_time
+        +bool completed
+        +str pet_name
+        +date due_date
+        +mark_complete() None
+        +next_occurrence(today: date) Task?
+    }
+
+    class ScheduledTask {
+        +Task task
+        +str start_time
+        +int start_minutes
+        +int end_minutes
+    }
+
+    class Scheduler {
+        +Owner owner
+        +str day_start
+        +date plan_date
+        +list~ScheduledTask~ plan
+        +list~Task~ skipped_tasks
+        +dict skip_reasons
+        +collect_tasks() list~Task~
+        +sort_tasks(tasks: list~Task~) list~Task~
+        +sort_by_time(tasks: list~Task~) list~Task~
+        +generate_plan() list~ScheduledTask~
+        +detect_conflicts() list~str~
+        +explain_plan() str
+        -_skip(task: Task, reason: str) None
+        -_find_open_start(duration_minutes: int) int
+    }
+
+    Owner "1" o-- "0..*" Pet : has
+    Pet "1" *-- "0..*" Task : has
+    Task ..> Task : creates next occurrence
+    Scheduler "1" --> "1" Owner : plans for
+    Scheduler "1" *-- "0..*" ScheduledTask : produces
+    Scheduler "1" --> "0..*" Task : tracks skipped
+    ScheduledTask "0..*" --> "1" Task : places
